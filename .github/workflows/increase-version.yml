@@ -71,7 +71,7 @@ jobs:
           echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Update setup.py version and create tag
-        id: update_setup_py_version_and_create_tag
+        id: update_setup_py_version
         run: |
           NEW_VERSION=${{ steps.generate_version.outputs.new_version }}
           SETUP_PY_MESSAGE="Update setup.py version to ${NEW_VERSION}"
@@ -89,9 +89,11 @@ jobs:
           # Get commit messages since last release in bullet point format
           PREVIOUS_TAG=${{ steps.get_current_tag.outputs.current_tag }}
           SETUP_PY_MESSAGE="${{ steps.update_setup_py_version.outputs.setup_py_message }}"  # Ensure this value is properly quoted in the YAML
-          COMMIT_MESSAGES=$(git log --pretty=format:"- %s" -- "${PREVIOUS_TAG}..HEAD" | sed 's/#patch//g' | sed 's/#minor//g' | sed 's/#major//g')
+          COMMIT_MESSAGES=$(git log --pretty=format:"- %s" "${PREVIOUS_TAG}..HEAD" | sed 's/#patch//g' | sed 's/#minor//g' | sed 's/#major//g' | grep -vE "${SETUP_PY_MESSAGE}")
+          
           # URL encode newlines to %0A for GitHub Actions output compatibility
           COMMIT_MESSAGES="${COMMIT_MESSAGES//$'\n'/%0A}"
+          
           # Prepend header to the commit messages, URL encoding the newlines
           COMMIT_MESSAGES="Commits since last release%0A%0A${COMMIT_MESSAGES}"
           echo "Commit messages: ${COMMIT_MESSAGES//%0A/$'\n'}"
