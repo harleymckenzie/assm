@@ -112,4 +112,4 @@ jobs:
           token: ${{ secrets.AUTH_TOKEN }}
           repository: harleymckenzie/homebrew-asc
           event-type: update-formula
-          client-payload: '{"version": "${{ steps.generate_version.outputs.new_version }}", "project": "${{ env.PROJECT }}"'
+          client-payload: '{"version": "${{ steps.generate_version.outputs.new_version }}", "project": "${{ env.PROJECT }}}"'
