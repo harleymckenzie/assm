@@ -74,7 +74,7 @@ jobs:
         run: |
           NEW_VERSION=${{ steps.generate_version.outputs.new_version }}
           SETUP_PY_MESSAGE="Update setup.py version to ${NEW_VERSION}"
-          sed -i "s/version='.*'/version='${NEW_VERSION}'/" setup.py
+          sed -i'' "s/version='.*'/version='${NEW_VERSION}'/" setup.py
           git add setup.py
           git diff-index --quiet HEAD || git commit -m "${SETUP_PY_MESSAGE}"
           echo "setup_py_message=${SETUP_PY_MESSAGE}" >> $GITHUB_OUTPUT
