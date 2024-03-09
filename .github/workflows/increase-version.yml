@@ -7,6 +7,11 @@ on:
       - closed
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The version to release'
+        required: true
 
 env:
   PROJECT: 'assm'
@@ -46,9 +51,12 @@ jobs:
 
       - name: Generate new version
         id: generate_version
-        # Outputs a new version number in the format of 'new_version=1.0.0'
         run: |
-          NEW_VERSION=$(python ./.github/scripts/bump-version.py)
+          if [[ "${{ github.event.inputs.version }}" == "" ]]; then
+            NEW_VERSION=$(python ./.github/scripts/bump-version.py)
+          else
+            NEW_VERSION=${{ github.event.inputs.version }}
+          fi
           echo "New version: ${NEW_VERSION}"
           echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
 
