@@ -56,11 +56,14 @@ jobs:
             NEW_VERSION=$(python ./.github/scripts/bump-version.py)
           else
             INPUT_VERSION=${{ github.event.inputs.version }}
-            # If the input version starts with a v, remove it
-            if [[ "$INPUT_VERSION" == v* ]]; then
-              NEW_VERSION=${INPUT_VERSION:1}
+            # Remove leading 'v' if present
+            SANITIZED_VERSION=$(echo $INPUT_VERSION | sed 's/^v//')
+            # Validate semver format
+            if [[ $SANITIZED_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              NEW_VERSION=$SANITIZED_VERSION
             else
-              NEW_VERSION=$INPUT_VERSION
+              echo "Error: Version does not follow semver format (X.Y.Z)"
+              exit 1
             fi
           fi
           echo "New version: ${NEW_VERSION}"
