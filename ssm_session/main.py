@@ -66,7 +66,7 @@ def arg_parser():
         description="Connect to an instance using the SSM session manager"
     )
     parser.add_argument(
-        '--version', action='version', version=version('asc')
+        '--version', action='version', version=version('assm')
     )
     parser.add_argument("--profile", "-p",
                         help="The AWS profile to use")
