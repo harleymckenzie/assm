@@ -15,6 +15,7 @@ import signal
 import logging
 import contextlib
 import json
+from importlib.metadata import version
 from datetime import datetime
 from argparse import ArgumentParser
 from simple_term_menu import TerminalMenu
@@ -63,6 +64,9 @@ def arg_parser():
 
     parser = ArgumentParser(
         description="Connect to an instance using the SSM session manager"
+    )
+    parser.add_argument(
+        '--version', action='version', version=version('asc')
     )
     parser.add_argument("--profile", "-p",
                         help="The AWS profile to use")
