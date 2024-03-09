@@ -56,6 +56,7 @@ jobs:
             NEW_VERSION=$(python ./.github/scripts/bump-version.py)
           else
             INPUT_VERSION=${{ github.event.inputs.version }}
+            echo "Input version: $INPUT_VERSION"
             # Remove leading 'v' if present
             SANITIZED_VERSION=$(echo $INPUT_VERSION | sed 's/^v//')
             # Validate semver format
@@ -88,7 +89,7 @@ jobs:
           # Get commit messages since last release in bullet point format
           PREVIOUS_TAG=${{ steps.get_current_tag.outputs.current_tag }}
           SETUP_PY_MESSAGE="${{ steps.update_setup_py_version.outputs.setup_py_message }}"  # Ensure this value is properly quoted in the YAML
-          COMMIT_MESSAGES=$(git log --pretty=format:"- %s" "${PREVIOUS_TAG}..HEAD" | sed 's/#patch//g' | sed 's/#minor//g' | sed 's/#major//g' | grep -vE "${SETUP_PY_MESSAGE}")
+          COMMIT_MESSAGES=$(git log --pretty=format:"- %s" -- "${PREVIOUS_TAG}..HEAD" | sed 's/#patch//g' | sed 's/#minor//g' | sed 's/#major//g')
           # URL encode newlines to %0A for GitHub Actions output compatibility
           COMMIT_MESSAGES="${COMMIT_MESSAGES//$'\n'/%0A}"
           # Prepend header to the commit messages, URL encoding the newlines
