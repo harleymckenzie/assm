@@ -1,0 +1,107 @@
+name: Increment Version
+concurrency: automated-release
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+env:
+  PROJECT: 'assm'
+
+jobs:
+  increment_version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      repository-projects: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+        
+      - name: Install dependencies
+        run: python -m pip install packaging
+
+      - name: Configure git
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'github-actions@github.com'
+
+      - name: Get current tag
+        id: get_current_tag
+        run: |
+          CURRENT_TAG=$(git tag --sort=-creatordate | head -n 1)
+          echo "Current tag: ${CURRENT_TAG}"
+          echo "current_tag=${CURRENT_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Generate new version
+        id: generate_version
+        # Outputs a new version number in the format of 'new_version=1.0.0'
+        run: |
+          NEW_VERSION=$(python ./.github/scripts/bump-version.py)
+          echo "New version: ${NEW_VERSION}"
+          echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Update setup.py version
+        id: update_setup_py_version
+        run: |
+          NEW_VERSION=${{ steps.generate_version.outputs.new_version }}
+          SETUP_PY_MESSAGE="Update setup.py version to ${NEW_VERSION}"
+          sed -i "s/version='.*'/version='${NEW_VERSION}'/" setup.py
+          git add setup.py
+          git commit -m "${SETUP_PY_MESSAGE}"
+          echo "setup_py_message=${SETUP_PY_MESSAGE}" >> $GITHUB_OUTPUT
+
+      - name: Create Tag
+        id: create_tag
+        run: |
+          NEW_TAG="v${{ steps.generate_version.outputs.new_version }}"
+          git tag -a "${NEW_TAG}" -m "Release ${NEW_TAG}"
+          git push origin "${NEW_TAG}"
+          git push
+
+      - name: Generate commit message list
+        id: generate_commit_message_list
+        run: |
+          # Get commit messages since last release in bullet point format
+          PREVIOUS_TAG=${{ steps.get_current_tag.outputs.current_tag }}
+          SETUP_PY_MESSAGE="${{ steps.update_setup_py_version.outputs.setup_py_message }}"  # Ensure this value is properly quoted in the YAML
+          COMMIT_MESSAGES=$(git log --pretty=format:"- %s" "${PREVIOUS_TAG}..HEAD" | sed 's/#patch//g' | sed 's/#minor//g' | sed 's/#major//g' | grep -vE "${SETUP_PY_MESSAGE}")
+          # URL encode newlines to %0A for GitHub Actions output compatibility
+          COMMIT_MESSAGES="${COMMIT_MESSAGES//$'\n'/%0A}"
+          # Prepend header to the commit messages, URL encoding the newlines
+          COMMIT_MESSAGES="Commits since last release%0A%0A${COMMIT_MESSAGES}"
+          echo "Commit messages: ${COMMIT_MESSAGES//%0A/$'\n'}"
+          echo "commit_messages<<EOF" >> $GITHUB_OUTPUT
+          echo -e "${COMMIT_MESSAGES//%0A/$'\n'}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        
+      - name: Create release
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: "v${{ steps.generate_version.outputs.new_version }}"
+          release_name: "v${{ steps.generate_version.outputs.new_version }}"
+          body: ${{ steps.generate_commit_message_list.outputs.commit_messages }}
+          draft: false
+          prerelease: false
+
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.AUTH_TOKEN }}
+          repository: harleymckenzie/homebrew-asc
+          event-type: update-formula
+          client-payload: '{"version": "${{ steps.generate_version.outputs.new_version }}", "project": "${{ env.PROJECT }}"'
