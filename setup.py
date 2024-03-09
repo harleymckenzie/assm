@@ -8,14 +8,14 @@ setup(
     packages=find_packages(),
     entry_points={
         'console_scripts': [
-            'assm=ssm-session:main',
+            'assm=ssm_session.main:main',
         ],
     },
     install_requires=[
         'boto3',
         'simple-term-menu',
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.9',
     description=('A helper script to connect to AWS instances using '
                  'SSM Session Manager'),
     author='Harley McKenzie',
