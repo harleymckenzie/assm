@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='AWS Simple Session Manager',
+    name='assm',
     version='0.0.4',
     packages=find_packages(),
     entry_points={
