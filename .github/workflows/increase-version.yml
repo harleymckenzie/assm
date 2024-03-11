@@ -70,7 +70,7 @@ jobs:
           echo "New version: ${NEW_VERSION}"
           echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
 
-      - name: Update setup.py version and create tag
+      - name: Update setup.py version
         id: update_setup_py_version
         run: |
           NEW_VERSION=${{ steps.generate_version.outputs.new_version }}
@@ -78,10 +78,12 @@ jobs:
           sed -i'' "s/version='.*'/version='${NEW_VERSION}'/" setup.py
           git add setup.py
           git commit -m "${SETUP_PY_MESSAGE}"
+          echo "setup_py_message=${SETUP_PY_MESSAGE}" >> $GITHUB_OUTPUT
 
       - name: Create tag
+        id: create_tag
         run: |
-          NEW_TAG=${{ steps.generate_version.outputs.new_version }}
+          NEW_TAG="v${{ steps.generate_version.outputs.new_version }}"
           git tag -a "${NEW_TAG}" -m "Release ${NEW_TAG}"
           git push origin "${NEW_TAG}"
           git push
@@ -91,7 +93,8 @@ jobs:
         run: |
           # Get commit messages since last release in bullet point format
           PREVIOUS_TAG=${{ steps.get_current_tag.outputs.current_tag }}
-          COMMIT_MESSAGES=$(git log --pretty=format:"- %s" "${PREVIOUS_TAG}..HEAD" | sed 's/#patch//g' | sed 's/#minor//g' | sed 's/#major//g' | grep -vE "Update setup.py version to " | grep -vE "Merge pull request")
+          SETUP_PY_MESSAGE="${{ steps.update_setup_py_version.outputs.setup_py_message }}"  # Ensure this value is properly quoted in the YAML
+          COMMIT_MESSAGES=$(git log --pretty=format:"- %s" "${PREVIOUS_TAG}..HEAD" | sed 's/#patch//g' | sed 's/#minor//g' | sed 's/#major//g' | grep -vE "${SETUP_PY_MESSAGE}")
           
           # URL encode newlines to %0A for GitHub Actions output compatibility
           COMMIT_MESSAGES="${COMMIT_MESSAGES//$'\n'/%0A}"
