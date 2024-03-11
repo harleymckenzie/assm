@@ -39,71 +39,16 @@ def main():
 
     session = create_session(args.profile)
 
-    if args.instance_id:
-        if args.action == "ssm":
-            start_ssm_session(session, args.instance_id)
-        elif args.action == "ssh":
-            ssh_to_instance(session, args.instance_id,
-                            args.user, args.identity)
-        elif args.action == "cmd":
-            send_command(session, args.instance_id, args.command)
-        elif args.action == "output":
-            print_instance(args.instance_id)
+    if args.action == "ssm":
+        start_ssm_session(session, args.instance_id)
+    elif args.action == "ssh":
+        ssh_to_instance(
+            session, args.instance_id, args.user, args.identity
+        )
+    elif args.action == "cmd":
+        send_command(session, args.instance_id, args.command)
     else:
         menu(session)
-
-
-def arg_parser():
-    """
-    Create and return the argument parser.
-    """
-    def file_exists(file_path):
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"File not found: {file_path}")
-        return file_path
-
-    parser = ArgumentParser(
-        description="Connect to an instance using the SSM session manager"
-    )
-    parser.add_argument(
-        '--version', action='version', version=version('assm')
-    )
-    parser.add_argument("--profile", "-p",
-                        help="The AWS profile to use")
-    parser.add_argument("-id", "--instance-id",
-                        help="Instance ID for the action")
-    parser.add_argument("--verbose", "-v",
-                        action="store_true",
-                        help="Enable verbose logging")
-    
-    # Create a subparsers object
-    subparsers = parser.add_subparsers(dest="action",
-                                       help="Available actions")
-
-    # SSM SSH Session
-    ssh_parser = subparsers.add_parser("ssh",
-                                       help="Connect to the instance using SSH")
-    ssh_parser.add_argument("-u", "--user",
-                            help="The user to connect as",
-                            default=os.environ["USER"])
-    ssh_parser.add_argument("-i", "--identity",
-                            help="The identity file to use for SSH",
-                            metavar="FILE",
-                            default=None, type=file_exists)
-
-    # SSM Session Subparser
-    ssm_parser = subparsers.add_parser("ssm",
-                                       help="Start an SSM session on the instance")
-
-    # Command Subparser
-    cmd_parser = subparsers.add_parser("cmd",
-                                       help="Send a command to the instance")
-
-    # Output Subparser
-    output_parser = subparsers.add_parser("output",
-                                          help="Print the instance ID")
-
-    return parser
 
 
 def menu(session):
@@ -305,9 +250,11 @@ def relative_time(time):
 
     # Determine which two largest measurements to display
     if days > 0:
-        formatted = f"{days} day{'s' if days != 1 else ''}, {hours} hour{'s' if hours != 1 else ''}, {minutes} minute{'s' if minutes != 1 else ''}"
+        formatted = (f"{days} day{'s' if days != 1 else ''}, {hours} hour{'s' if hours != 1 else ''}, "
+                     f"{minutes} minute{'s' if minutes != 1 else ''}")
     else:
-        formatted = f"{hours} hour{'s' if hours != 1 else ''}, {minutes} minute{'s' if minutes != 1 else ''}"
+        formatted = (f"{hours} hour{'s' if hours != 1 else ''}, "
+                     f"{minutes} minute{'s' if minutes != 1 else ''}")
 
     return formatted
 
@@ -329,7 +276,8 @@ def ignore_user_entered_signals():
 
 
 def ssh_to_instance(
-        session, instance_id, user=os.environ["USER"], identity=None):
+    session, instance_id, user=os.environ["USER"], identity=None
+):
     """
     SSH into an instance using the provided session and instance ID.
 
@@ -338,7 +286,8 @@ def ssh_to_instance(
     """
     # Start an SSM session and get the necessary data for ProxyCommand
     session_response, endpoint_url = create_ssm_session(
-        session, instance_id, ssh=True)
+        session, instance_id, ssh=True
+    )
 
     # Construct the ProxyCommand with dynamic session data
     proxy_command = [
@@ -355,8 +304,6 @@ def ssh_to_instance(
     proxy_command_str = " ".join(
         ['"' + arg.replace('"', '\\"') + '"' for arg in proxy_command]
     )
-    print("Proxy command 2:")
-    print(proxy_command_str)
 
     # Specify the user and identity file if provided
     if identity:
@@ -364,7 +311,8 @@ def ssh_to_instance(
             "ssh",
             "-o",
             f"ProxyCommand={proxy_command_str}",
-            f"-i {identity}",
+            "-i",
+            f"{identity}",
             f"{user}@{instance_id}",
         ]
     else:
@@ -375,11 +323,13 @@ def ssh_to_instance(
             f"{user}@{instance_id}",
         ]
 
-    logging.debug("SSH command: %s", ssh_command)
+    logging.debug("SSH command: %s", " ".join(ssh_command))
     try:
         subprocess.check_call(ssh_command, shell=False)
     except subprocess.CalledProcessError as e:
-        print(f"Error: {e}")
+        logging.debug("Error: %s", e)
+        close_ssm_session(session, session_response["SessionId"])
+        exit(1)
 
     close_ssm_session(session, session_response["SessionId"])
 
@@ -406,9 +356,7 @@ def start_ssm_session(session, instance_id):
 
     try:
         with ignore_user_entered_signals():
-            # Print the full session-manager-plugin command used for the subprocess
-            print("Start SSM session command:")
-            print(" ".join(command))
+            logging.debug("Start SSM session command: %s", " ".join(command))
             subprocess.check_call(command)
         return 0
     except OSError as ex:
@@ -432,33 +380,24 @@ def close_ssm_session(session, session_id):
 
 def create_ssm_session(session, instance_id, ssh=False):
     """
-    Create an SSM session for the specified instance. Optionally, create an SSH session.
+    Create an SSM session for the specified instance. Optionally, create an
+    SSH session.
 
     :param session: The AWS session
     :param instance_id: The instance ID for the SSM session
     :param ssh: Boolean indicating if the session is for SSH
     """
     ssm_client = session.client("ssm")
-    if ssh:
-        # For SSH sessions, use the AWS-StartSSHSession document
-        document_name = "AWS-StartSSHSession"
-    else:
-        # For regular SSM sessions, no document name is required
-        document_name = None
+    document_name = "AWS-StartSSHSession" if ssh else None
 
     try:
-        if document_name:
-            response = ssm_client.start_session(
-                Target=instance_id, DocumentName=document_name
-            )
-        else:
-            response = ssm_client.start_session(Target=instance_id)
-        print(f"SSM Session started with SessionId: {response['SessionId']}")
+        response = ssm_client.start_session(
+            Target=instance_id, DocumentName=document_name
+        ) if document_name else ssm_client.start_session(Target=instance_id)
     except Exception as e:
         print(f"Unexpected error: {e}")
 
-    endpoint_url = ssm_client.meta.endpoint_url
-    return (response, endpoint_url)
+    return (response, ssm_client.meta.endpoint_url)
 
 
 def send_command(session, instance_id, user_command):
@@ -499,6 +438,74 @@ def print_instance(instance_id):
     :param instance_id: The instance ID to print
     """
     print(instance_id)
+
+
+def arg_parser():
+    """
+    Create and return the argument parser.
+    """
+
+    def file_exists(file_path):
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+        return file_path
+
+    parser = ArgumentParser(
+        description="Connect to an instance using the SSM session manager"
+    )
+    parser.add_argument("--version", action="version", version=version("assm"))
+    parser.add_argument("--profile", "-p", help="The AWS profile to use")
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Enable verbose logging"
+    )
+
+    # Create a subparsers object
+    subparsers = parser.add_subparsers(dest="action", help="Available actions")
+
+    # SSM SSH Session
+    ssh_parser = subparsers.add_parser(
+        "ssh", help="Connect to the instance using SSH"
+    )
+    ssh_parser.add_argument(
+        "instance_id", help="The instance ID to connect to"
+    )
+    ssh_parser.add_argument(
+        "-u",
+        "--user",
+        help="The user to connect as",
+        default=os.environ["USER"],
+    )
+    ssh_parser.add_argument(
+        "-i",
+        "--identity",
+        help="The identity file to use for SSH",
+        metavar="FILE",
+        default=None,
+        type=file_exists,
+    )
+
+    # SSM Session Subparser
+    ssm_parser = subparsers.add_parser(
+        "ssm", help="Start an SSM session on the instance"
+    )
+    ssm_parser.add_argument(
+        "instance_id", help="The instance ID to start the session on"
+    )
+
+    # Command Subparser
+    cmd_parser = subparsers.add_parser(
+        "cmd", help="Send a command to the instance"
+    )
+    cmd_parser.add_argument(
+        "instance_id", help="The instance ID to send the command to"
+    )
+    cmd_parser.add_argument(
+        "command",
+        help="The command to send to the instance",
+        metavar="COMMAND"
+    )
+
+    return parser
 
 
 if __name__ == "__main__":
