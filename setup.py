@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='assm',
-    version='0.0.6',
+    version='0.0.3',
     packages=find_packages(),
     entry_points={
         'console_scripts': [
