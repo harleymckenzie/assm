@@ -18,6 +18,7 @@ import json
 from importlib.metadata import version
 from datetime import datetime
 from argparse import ArgumentParser
+import botocore
 from simple_term_menu import TerminalMenu
 from boto3 import Session
 
@@ -31,65 +32,33 @@ def main():
     using SSH, start an SSM session, send a command to the instance, or print
     the instance ID.
     """
-    parser = arg_parser()
-    args = parser.parse_args()
+    try:
+        parser = arg_parser()
+        args = parser.parse_args()
+        logging.basicConfig(level=logging.WARNING)
+        logging.getLogger("botocore").setLevel(logging.ERROR)
 
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
+        if args.verbose:
+            logging.basicConfig(level=logging.DEBUG)
 
-    session = create_session(args.profile)
+        session = create_session(args.profile)
 
-    if args.action == "ssm":
-        start_ssm_session(session, args.instance_id)
-    elif args.action == "ssh":
-        ssh_to_instance(
-            session, args.instance_id, args.user, args.identity
-        )
-    elif args.action == "cmd":
-        send_command(session, args.instance_id, args.command)
-    else:
-        menu(session)
-
-
-def menu(session):
-    """
-    Create the main menu
-
-    :param session: The AWS session
-    """
-    instance_ids = get_instance_ids(session)
-    instance_info = get_instance_info(session, instance_ids)
-    selection = menu_create(instance_info)
-
-    if selection:
-        handle_selection(session, selection)
-
-
-def handle_selection(session, instance_id):
-    """
-    Handle the selected action for a given instance.
-
-    :param session: The AWS session
-    :param instance_id: The selected instance ID
-    """
-    actions = [
-        "Connect to instance (SSH)",
-        "Connect to instance (SSM Session)",
-        "Print instance ID",
-        "Send Command",
-    ]
-    action_menu = TerminalMenu(actions, title="Select an action")
-    action_index = action_menu.show()
-
-    if action_index == 0:
-        ssh_to_instance(session, instance_id)
-    elif action_index == 1:
-        start_ssm_session(session, instance_id)
-    elif action_index == 2:
-        print_instance(instance_id)
-    elif action_index == 3:
-        user_command = input("Enter the command to run: ")
-        send_command(session, instance_id, user_command)
+        if args.action == "ssm":
+            start_ssm_session(session, args.instance_id)
+        elif args.action == "ssh":
+            ssh_to_instance(
+                session, args.instance_id, args.user, args.identity
+            )
+        elif args.action == "cmd":
+            send_command(session, args.instance_id, args.command)
+        else:
+            menu(session)
+    except KeyboardInterrupt:
+        print("Exiting...")
+        exit(0)
+    except botocore.exceptions.BotoCoreError as e:
+        print(f"Error: {e}")
+        exit(1)
 
 
 def menu_create(items):
@@ -97,7 +66,7 @@ def menu_create(items):
     Create a menu to select an instance
 
     :param items: The list of items to display in the menu
-    :return: The selected item
+    :return: The terminal_menu.chosen_accept_key, The selected item
     """
     item_details = {
         item["id"]: "\n".join(
@@ -124,16 +93,33 @@ def menu_create(items):
         else:
             print("No match found")
 
-        return item_details.get(instance_id, "")
+        preview = item_details.get(instance_id, "")
+        shortcut_color = "\033[93m"
+        quit_color = "\033[91m"
+        reset_color = "\033[0m"
+
+        shortcuts = [
+            f"{shortcut_color}[M]{reset_color} Connect via SSM Session",
+            f"{shortcut_color}[S]{reset_color} Connect via SSH",
+            f"{shortcut_color}[P]{reset_color} Print ID",
+            f"{shortcut_color}[C]{reset_color} Send Command",
+            f"{quit_color}[Q]{reset_color} Quit",
+        ]
+
+        shortcut_text = "  ".join(shortcuts)
+        # info_message = info_messages.get(instance_id, "")
+        return f"{preview}\n\n" f"{reset_color} {shortcut_text}"
 
     menu_options = [f"{item['name']} ({item['id']})" for item in items]
     terminal_menu = TerminalMenu(
         menu_options,
         title="Select an instance",
+        accept_keys=["m", "s", "p", "c", "enter"],
         preview_command=menu_generate_preview,  # Use the nested function
         preview_size=0.75,
         cycle_cursor=True,
         clear_screen=True,
+        show_search_hint=True,
     )
 
     menu_entry_index = terminal_menu.show()
@@ -144,7 +130,60 @@ def menu_create(items):
         print("No selection was made.")
         selection = None
 
-    return selection
+    return terminal_menu.chosen_accept_key, selection
+
+
+def menu(session):
+    """
+    Create the main menu.
+    If a selection is made using one of the custom accept keys, handle the
+    selection. If no selection is made, call the handle selection function.
+
+    :param session: The AWS session
+    """
+    instance_ids = get_instance_ids(session)
+
+    instance_info = get_instance_info(session, instance_ids)
+    action, instance_id = menu_create(instance_info)
+
+    if action == "m":
+        start_ssm_session(session, instance_id)
+    elif action == "s":
+        ssh_to_instance(session, instance_id)
+    elif action == "p":
+        print_instance(instance_id)
+    elif action == "c":
+        user_command = input("Enter the command to run: ")
+        send_command(session, instance_id, user_command)
+    elif action == "enter":
+        handle_selection(session, instance_id)
+
+
+def handle_selection(session, instance_id):
+    """
+    Handle the selected action for a given instance.
+
+    :param session: The AWS session
+    :param instance_id: The selected instance ID
+    """
+    actions = [
+        "[s] Connect to instance (SSH)",
+        "[m] Connect to instance (SSM Session)",
+        "[p] Print instance ID",
+        "[c] Send Command",
+    ]
+    action_menu = TerminalMenu(actions, title="Select an action")
+    action_index = action_menu.show()
+
+    if action_index == 0:
+        ssh_to_instance(session, instance_id)
+    elif action_index == 1:
+        start_ssm_session(session, instance_id)
+    elif action_index == 2:
+        print_instance(instance_id)
+    elif action_index == 3:
+        user_command = input("Enter the command to run: ")
+        send_command(session, instance_id, user_command)
 
 
 def create_session(profile):
@@ -158,7 +197,7 @@ def create_session(profile):
 
     if profile:
         session_params["profile_name"] = profile
-        logging.debug(f"Using profile: {profile}")
+        logging.debug("Using profile: %s", profile)
 
     try:
         session = Session(**session_params)
@@ -178,11 +217,7 @@ def get_instance_ids(session):
     """
     ssm = session.client("ssm")
 
-    try:
-        response = ssm.describe_instance_information()
-    except Exception as e:
-        print(f"Error: {e}")
-        exit(1)
+    response = ssm.describe_instance_information()
 
     instances = []
     for instance in response["InstanceInformationList"]:
@@ -201,11 +236,8 @@ def get_instance_info(session, instances):
     :return: A list of instance information
     """
     ec2_client = session.client("ec2")
-    try:
-        response = ec2_client.describe_instances(InstanceIds=instances)
-    except Exception as e:
-        print(f"Error: {e}")
-        exit(1)
+
+    response = ec2_client.describe_instances(InstanceIds=instances)
 
     instance_info = []
     for reservation in response["Reservations"]:
@@ -246,15 +278,19 @@ def relative_time(time):
 
     days = diff.days
     hours, remainder = divmod(diff.seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
+    minutes = divmod(remainder, 60)
 
     # Determine which two largest measurements to display
     if days > 0:
-        formatted = (f"{days} day{'s' if days != 1 else ''}, {hours} hour{'s' if hours != 1 else ''}, "
-                     f"{minutes} minute{'s' if minutes != 1 else ''}")
+        formatted = (
+            f"{days} day{'s' if days != 1 else ''}, {hours} hour{'s' if hours != 1 else ''}, "
+            f"{minutes} minute{'s' if minutes != 1 else ''}"
+        )
     else:
-        formatted = (f"{hours} hour{'s' if hours != 1 else ''}, "
-                     f"{minutes} minute{'s' if minutes != 1 else ''}")
+        formatted = (
+            f"{hours} hour{'s' if hours != 1 else ''}, "
+            f"{minutes} minute{'s' if minutes != 1 else ''}"
+        )
 
     return formatted
 
@@ -286,7 +322,7 @@ def ssh_to_instance(
     """
     # Start an SSM session and get the necessary data for ProxyCommand
     session_response, endpoint_url = create_ssm_session(
-        session, instance_id, ssh=True
+        session, instance_id, document_name="AWS-StartSSHSession"
     )
 
     # Construct the ProxyCommand with dynamic session data
@@ -306,22 +342,13 @@ def ssh_to_instance(
     )
 
     # Specify the user and identity file if provided
-    if identity:
-        ssh_command = [
-            "ssh",
-            "-o",
-            f"ProxyCommand={proxy_command_str}",
-            "-i",
-            f"{identity}",
-            f"{user}@{instance_id}",
-        ]
-    else:
-        ssh_command = [
-            "ssh",
-            "-o",
-            f"ProxyCommand={proxy_command_str}",
-            f"{user}@{instance_id}",
-        ]
+    ssh_command = [
+        "ssh",
+        "-o",
+        f"ProxyCommand={proxy_command_str}",
+        *(["-i", identity] if identity else []),
+        f"{user}@{instance_id}",
+    ]
 
     logging.debug("SSH command: %s", " ".join(ssh_command))
     try:
@@ -330,7 +357,6 @@ def ssh_to_instance(
         logging.debug("Error: %s", e)
         close_ssm_session(session, session_response["SessionId"])
         exit(1)
-
     close_ssm_session(session, session_response["SessionId"])
 
 
@@ -341,8 +367,9 @@ def start_ssm_session(session, instance_id):
     :param session: The AWS session
     :param instance_id: The instance ID for the SSM session
     """
-    print("Starting SSM session")
-    session_response, endpoint_url = create_ssm_session(session, instance_id)
+    session_response, endpoint_url = create_ssm_session(
+        session, instance_id, document_name="SSM-SessionManagerRunShell"
+    )
 
     command = [
         "session-manager-plugin",
@@ -365,6 +392,8 @@ def start_ssm_session(session, instance_id):
             raise ValueError(
                 "The session-manager-plugin executable could not be found."
             ) from ex
+    finally:
+        close_ssm_session(session, session_response["SessionId"])
 
 
 def close_ssm_session(session, session_id):
@@ -378,7 +407,7 @@ def close_ssm_session(session, session_id):
     ssm_client.terminate_session(SessionId=session_id)
 
 
-def create_ssm_session(session, instance_id, ssh=False):
+def create_ssm_session(session, instance_id, document_name):
     """
     Create an SSM session for the specified instance. Optionally, create an
     SSH session.
@@ -388,14 +417,19 @@ def create_ssm_session(session, instance_id, ssh=False):
     :param ssh: Boolean indicating if the session is for SSH
     """
     ssm_client = session.client("ssm")
-    document_name = "AWS-StartSSHSession" if ssh else None
 
     try:
-        response = ssm_client.start_session(
-            Target=instance_id, DocumentName=document_name
-        ) if document_name else ssm_client.start_session(Target=instance_id)
-    except Exception as e:
-        print(f"Unexpected error: {e}")
+        response = (
+            ssm_client.start_session(
+                Target=instance_id, DocumentName=document_name
+            )
+        )
+    except ssm_client.exceptions.ClientError as e:
+        print(
+            f"{e}\n\nPlease check your permissions and ensure the instance "
+            "has appropriate permissions to use Session Manager."
+        )
+        exit(1)
 
     return (response, ssm_client.meta.endpoint_url)
 
@@ -502,7 +536,7 @@ def arg_parser():
     cmd_parser.add_argument(
         "command",
         help="The command to send to the instance",
-        metavar="COMMAND"
+        metavar="COMMAND",
     )
 
     return parser
