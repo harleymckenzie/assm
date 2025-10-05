@@ -1,0 +1,108 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      # - linux    // Disable linux and windows until there is a need for them
+      # - windows
+      - darwin
+    binary: assm
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  footer: >-
+
+    ---
+
+    Released by [GoReleaser](https://github.com/goreleaser/goreleaser).
+
+brews:
+  # Stable formula (only on stable tags)
+  - name: assm
+    goarm: 6
+    goamd64: v1
+    url_template: "https://github.com/harleymckenzie/assm/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    homepage: "https://github.com/harleymckenzie/assm"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    directory: Formula
+    description: "A CLI designed to provide a more simplified way to connect to EC2 instances using via AWS Systems Manager Sessions Manager."
+    license: "MIT"
+    # Skip on prerelease tags
+    skip_upload: "{{ if .Prerelease }}true{{ end }}"
+    test: |
+      system "#{bin}/assm help"
+    install: |
+      bin.install "assm"
+    extra_install: |
+      generate_completions_from_executable(bin/"assm", "completion", shells: [:bash, :zsh, :fish])
+    repository:
+      owner: harleymckenzie
+      name: homebrew-asc
+      pull_request:
+        enabled: true
+        draft: true
+        base:
+          owner: harleymckenzie
+          name: homebrew-asc
+          branch: main
+
+  # Beta formula (only on prerelease tags)
+  - name: assm-beta
+    goarm: 6
+    goamd64: v1
+    url_template: "https://github.com/harleymckenzie/assm/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    homepage: "https://github.com/harleymckenzie/assm"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }}-beta version {{ .Tag }}"
+    directory: Formula
+    description: "A CLI designed to provide a more simplified way to connect to EC2 instances using via AWS Systems Manager Sessions Manager. (Beta channel)"
+    license: "MIT"
+    # Skip on stable tags
+    skip_upload: "{{ if not .Prerelease }}true{{ end }}"
+    test: |
+      system "#{bin}/assm help"
+    install: |
+      bin.install "assm"
+    extra_install: |
+      generate_completions_from_executable(bin/"assm", "completion", shells: [:bash, :zsh, :fish])
+    repository:
+      owner: harleymckenzie
+      name: homebrew-asc
+      pull_request:
+        enabled: true
+        draft: true
+        base:
+          owner: harleymckenzie
+          name: homebrew-asc
+          branch: main
