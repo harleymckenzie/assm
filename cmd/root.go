@@ -16,7 +16,7 @@ import (
 
 // Global configuration variables
 var (
-	Version = "0.0.1"
+	Version = "0.0.2"
 )
 
 var (
@@ -25,9 +25,9 @@ var (
 		Short:   "A tool to manage and connect to EC2 instances",
 		Version: Version,
 		// Allow an optional "instance id" arg to connect directly to the instance
-		CompletionOptions: cobra.CompletionOptions{
-			DisableDefaultCmd: true,
-		},
+		// CompletionOptions: cobra.CompletionOptions{
+		// 	DisableDefaultCmd: true,
+		// },
 		Run: func(cmd *cobra.Command, args []string) {
 			// 1. Check and confirm the session manager plugin has been installed
 			if err := verifyPlugin(); err != nil {
@@ -89,6 +89,7 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringP("profile", "p", "", "AWS profile to use for authentication.")
 	rootCmd.PersistentFlags().StringP("region", "r", "", "AWS region.")
+	rootCmd.AddCommand(completionCmd())
 }
 
 func getPersistentFlags(cmd *cobra.Command) (string, string) {
