@@ -37,7 +37,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if len(m.table.SelectedRow()) > 1 {
 				m.selectedID = m.table.SelectedRow()[1]
-				fmt.Printf("[table update] selected row: %s\n", m.selectedID)
 				m.done = true
 				return m, tea.Quit
 			}
@@ -54,12 +53,12 @@ func (m model) View() string {
 	return baseStyle.Render(m.table.View()) + "\n"
 }
 
-func Render(rows []table.Row) string {
+func ShowTableAndSelect(rows []table.Row) string {
 	columns := []table.Column{
 		{Title: "Name", Width: 30},
-		{Title: "ID", Width: 20},
-		{Title: "State", Width: 8},
-		{Title: "Type", Width: 10},
+		{Title: "Instance ID", Width: 20},
+		{Title: "State", Width: 10},
+		{Title: "Type", Width: 12},
 	}
 
 	t := table.New(
@@ -77,7 +76,7 @@ func Render(rows []table.Row) string {
 		Bold(false)
 	s.Selected = s.Selected.
 		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
+		Background(lipgloss.Color("33")).
 		Bold(false)
 	t.SetStyles(s)
 
@@ -90,7 +89,6 @@ func Render(rows []table.Row) string {
 
 	// Cast the final model to get the selectedID
 	if finalM, ok := finalModel.(model); ok {
-		fmt.Printf("[table] returning instance id: %s\n", finalM.selectedID)
 		return finalM.selectedID
 	}
 	

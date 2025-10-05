@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/harleymckenzie/assm/internal/apperror"
 	"github.com/harleymckenzie/assm/internal/aws"
-	"github.com/harleymckenzie/assm/internal/exitcode"
 	"github.com/harleymckenzie/assm/internal/table"
 	"github.com/spf13/cobra"
 )
@@ -21,55 +21,59 @@ var (
 
 var (
 	rootCmd = &cobra.Command{
-		Use:     "assm",
+		Use:     "assm [instance id]",
 		Short:   "A tool to manage and connect to EC2 instances",
 		Version: Version,
+		// Allow an optional "instance id" arg to connect directly to the instance
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: true,
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			// 1. Check and confirm the session manager plugin has been installed
 			if err := verifyPlugin(); err != nil {
-				exitcode.New(exitcode.CodeUnknownCommand, fmt.Errorf("verify session-manager-plugin: %w", err))
+				apperror.Exit(apperror.New(apperror.CodePluginNotFound, fmt.Errorf("verify session-manager-plugin: %w", err)))
 			}
 
 			ctx := context.TODO()
 			profile, region := getPersistentFlags(cmd)
 			awsCfg, err := aws.LoadDefaultConfig(ctx, profile, region)
 			if err != nil {
-				exitcode.New(exitcode.CodeGeneralError, fmt.Errorf("load AWS config: %w", err))
+				apperror.Exit(apperror.New(apperror.CodeGeneralError, fmt.Errorf("load config: %w", err)))
 			}
-			
+
 			// 2. Create the service clients
 			ec2Client, err := aws.NewEC2Service(ctx, awsCfg)
 			if err != nil {
-				exitcode.New(exitcode.CodeGeneralError, fmt.Errorf("create ec2 service: %w", err))
+				apperror.Exit(apperror.New(apperror.CodeGeneralError, fmt.Errorf("create ec2 service: %w", err)))
 			}
-			
+
 			ssmClient, err := aws.NewSSMService(ctx, awsCfg)
 			if err != nil {
-				exitcode.New(exitcode.CodeGeneralError, fmt.Errorf("create ssm service: %w", err))
+				apperror.Exit(apperror.New(apperror.CodeGeneralError, fmt.Errorf("create ssm service: %w", err)))
 			}
 
 			// 3. Get EC2 instances
 			instances, err := ec2Client.GetEC2Instances(ctx)
 			if err != nil {
-				exitcode.New(exitcode.CodeGeneralError, fmt.Errorf("get ec2 instances: %w", err))
+				apperror.Exit(apperror.New(apperror.CodeGeneralError, fmt.Errorf("get ec2 instances: %w", err)))
 			}
 
 			// 4. Format into Rows
 			rows, err := table.BuildRows(instances)
 			if err != nil {
-				exitcode.New(exitcode.CodeGeneralError, fmt.Errorf("build rows: %w", err))
+				apperror.Exit(apperror.New(apperror.CodeGeneralError, fmt.Errorf("build rows: %w", err)))
 			}
 			// 5. Print table output and return selected instance id
-			instanceId := table.Render(rows)
-			fmt.Printf("Returned instance id: %s\n", instanceId)
+			instanceId := table.ShowTableAndSelect(rows)
+			if instanceId == "" {
+				fmt.Println("No instance selected. Exiting.")
+				return
+			}
 
 			// 6. Create session manager session and return the session response
 			err = ssmClient.StartSession(ctx, profile, awsCfg.Config.Region, instanceId)
 			if err != nil {
-				exitcode.New(exitcode.CodeGeneralError, fmt.Errorf("start session: %w", err))
+				apperror.Exit(apperror.New(apperror.CodeGeneralError, fmt.Errorf("start session: %w", err)))
 			}
 		},
 	}
@@ -83,7 +87,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringP("profile", "p", "", "AWS profile to use for authentication. Will be used as client-id if no client-id is provided.")
+	rootCmd.PersistentFlags().StringP("profile", "p", "", "AWS profile to use for authentication.")
 	rootCmd.PersistentFlags().StringP("region", "r", "", "AWS region.")
 }
 

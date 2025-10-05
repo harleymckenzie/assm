@@ -59,7 +59,7 @@ brews:
     # Skip on prerelease tags
     skip_upload: "{{ if .Prerelease }}true{{ end }}"
     test: |
-      system "#{bin}/assm help"
+      system "#{bin}/assm --help"
     install: |
       bin.install "assm"
     extra_install: |
@@ -91,7 +91,7 @@ brews:
     # Skip on stable tags
     skip_upload: "{{ if not .Prerelease }}true{{ end }}"
     test: |
-      system "#{bin}/assm help"
+      system "#{bin}/assm --help"
     install: |
       bin.install "assm"
     extra_install: |
