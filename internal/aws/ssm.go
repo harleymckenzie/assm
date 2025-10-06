@@ -48,13 +48,10 @@ func (svc *SSMService) StartSession(ctx context.Context, profile string, region 
 		"Target": instanceId,
 	}
 	paramsJSON, _ := json.Marshal(params)
-	fmt.Printf("Params json: %s\n", paramsJSON)
 
 	// 3) Invoke the plugin (stdin/out wired to your TUI)
 	respJSON, _ := json.Marshal(out)
-	fmt.Printf("Response json: %s\n", respJSON)
 
-	fmt.Printf("Profile: %s, Region: %s\n", profile, region)
 	cmd := exec.CommandContext(ctx, "session-manager-plugin",
 		string(respJSON),
 		region,
