@@ -16,7 +16,7 @@ import (
 
 // Global configuration variables
 var (
-	Version = "0.0.2"
+	Version = "0.0.3"
 )
 
 var (
@@ -71,9 +71,15 @@ var (
 			}
 
 			// 6. Create session manager session and return the session response
-			err = ssmClient.StartSession(ctx, profile, awsCfg.Config.Region, instanceId)
+			sessionId, err := ssmClient.StartSession(ctx, profile, awsCfg.Config.Region, instanceId)
 			if err != nil {
 				apperror.Exit(apperror.New(apperror.CodeGeneralError, fmt.Errorf("start session: %w", err)))
+			}
+
+			// 7. Terminate session manager session
+			err = ssmClient.TerminateSession(ctx, profile, awsCfg.Config.Region, sessionId)
+			if err != nil {
+				apperror.Exit(apperror.New(apperror.CodeGeneralError, fmt.Errorf("terminate session: %w", err)))
 			}
 		},
 	}

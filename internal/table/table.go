@@ -13,15 +13,16 @@ var baseStyle = lipgloss.NewStyle().
 	BorderStyle(lipgloss.NormalBorder()).
 	BorderForeground(lipgloss.Color("240"))
 
-type model struct {
+// model is the model for the table
+type Model struct {
 	table      table.Model
 	selectedID string
 	done       bool
 }
 
-func (m model) Init() tea.Cmd { return nil }
+func (m Model) Init() tea.Cmd { return nil }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -46,13 +47,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) View() string {
+func (m Model) View() string {
 	if m.done {
 		return ""
 	}
 	return baseStyle.Render(m.table.View()) + "\n"
 }
 
+// ShowTableAndSelect shows the table and selects the instance
 func ShowTableAndSelect(rows []table.Row) string {
 	columns := []table.Column{
 		{Title: "Name", Width: 30},
@@ -80,7 +82,7 @@ func ShowTableAndSelect(rows []table.Row) string {
 		Bold(false)
 	t.SetStyles(s)
 
-	m := model{table: t}
+	m := Model{table: t}
 	finalModel, err := tea.NewProgram(m).Run()
 	if err != nil {
 		fmt.Println("Error running program:", err)
@@ -88,7 +90,7 @@ func ShowTableAndSelect(rows []table.Row) string {
 	}
 
 	// Cast the final model to get the selectedID
-	if finalM, ok := finalModel.(model); ok {
+	if finalM, ok := finalModel.(Model); ok {
 		return finalM.selectedID
 	}
 	

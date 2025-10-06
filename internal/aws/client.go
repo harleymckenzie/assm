@@ -9,10 +9,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 )
 
+// BaseService is a struct that holds the AWS config
 type BaseService struct {
 	Config aws.Config
 }
 
+// LoadDefaultConfig loads the default AWS config
 func LoadDefaultConfig(ctx context.Context, profile string, region string) (*BaseService, error) {
 	opts := []func(*config.LoadOptions) error{}
 
