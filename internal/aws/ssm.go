@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -20,7 +22,7 @@ type SSMClient interface {
 
 // SSMService is a struct that holds the SSM client
 type SSMService struct {
-	Client  SSMClient
+	Client SSMClient
 }
 
 // NewSSMService creates a new SSM service
@@ -57,7 +59,7 @@ func (svc *SSMService) StartSession(ctx context.Context, profile string, region 
 	respJSON, _ := json.Marshal(out)
 
 	fmt.Printf("Connecting to instance %s using session ID: %s\n", instanceId, sessionId)
-	cmd := exec.CommandContext(ctx, "session-manager-plugin",
+	cmd := exec.Command("session-manager-plugin",
 		string(respJSON),
 		region,
 		"StartSession",
@@ -68,9 +70,36 @@ func (svc *SSMService) StartSession(ctx context.Context, profile string, region 
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	_ = cmd.Run()
 
-	return sessionId, nil
+	// Set up signal handling to forward SIGINT to the plugin process
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
+
+	// Start the command
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("start plugin: %w", err)
+	}
+
+	// Handle signals by forwarding them to the plugin process
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	// Forward any signals to the plugin process and wait for it to finish
+	for {
+		select {
+		case sig := <-sigChan:
+			if cmd.Process != nil {
+				// Forward the signal to the plugin process instead of terminating our process
+				_ = cmd.Process.Signal(sig)
+			}
+		case err = <-done:
+			// Command finished (either normally or after signal)
+			return sessionId, err
+		}
+	}
 }
 
 func (svc *SSMService) TerminateSession(ctx context.Context, profile string, region string, sessionId string) error {
