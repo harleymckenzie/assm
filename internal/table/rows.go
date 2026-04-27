@@ -2,6 +2,7 @@ package table
 
 import (
 	"sort"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -27,11 +28,16 @@ func BuildRows(instances []types.Instance) ([]table.Row, error) {
 
 	rows := make([]table.Row, len(instances))
 	for i, instance := range instances {
+		launchTime := ""
+		if instance.LaunchTime != nil {
+			launchTime = instance.LaunchTime.UTC().Format(time.DateTime)
+		}
 		row := table.Row{
 			GetTagValue("Name", instance),
 			aws.ToString(instance.InstanceId),
 			string(instance.State.Name),
 			string(instance.InstanceType),
+			launchTime,
 		}
 		rows[i] = row
 	}

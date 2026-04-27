@@ -61,13 +61,14 @@ func ShowTableAndSelect(rows []table.Row) string {
 		{Title: "Instance ID", Width: 20},
 		{Title: "State", Width: 10},
 		{Title: "Type", Width: 12},
+		{Title: "Launched", Width: 19},
 	}
 
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(7),
+		table.WithHeight(15),
 	)
 
 	s := table.DefaultStyles()

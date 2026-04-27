@@ -24,10 +24,7 @@ var (
 		Use:     "assm [instance id]",
 		Short:   "A tool to manage and connect to EC2 instances",
 		Version: Version,
-		// Allow an optional "instance id" arg to connect directly to the instance
-		// CompletionOptions: cobra.CompletionOptions{
-		// 	DisableDefaultCmd: true,
-		// },
+		Args: cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			// 1. Check and confirm the session manager plugin has been installed
 			if err := verifyPlugin(); err != nil {
@@ -63,8 +60,13 @@ var (
 			if err != nil {
 				apperror.Exit(apperror.New(apperror.CodeGeneralError, fmt.Errorf("build rows: %w", err)))
 			}
-			// 5. Print table output and return selected instance id
-			instanceId := table.ShowTableAndSelect(rows)
+			// 5. Use provided instance ID arg or select from table
+			var instanceId string
+			if len(args) > 0 {
+				instanceId = args[0]
+			} else {
+				instanceId = table.ShowTableAndSelect(rows)
+			}
 			if instanceId == "" {
 				fmt.Println("No instance selected. Exiting.")
 				return
