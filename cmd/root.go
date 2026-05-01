@@ -16,7 +16,7 @@ import (
 
 // Global configuration variables
 var (
-	Version = "0.0.4"
+	Version = "0.1.0"
 )
 
 var (
