@@ -59,6 +59,20 @@ jobs:
     if: ${{ needs.versionbump.outputs.new_tag }}
     runs-on: ubuntu-latest
     steps:
+      # Mint a short-lived GitHub App installation token so GoReleaser can push
+      # the Homebrew formula to the separate harleymckenzie/homebrew-asc tap.
+      # The built-in GITHUB_TOKEN is scoped to this repo only and cannot write
+      # to another repository.
+      - name: Generate app token
+        id: app_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+          owner: harleymckenzie
+          repositories: |
+            assm
+            homebrew-asc
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -77,4 +91,4 @@ jobs:
           version: '~> v2'
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app_token.outputs.token }}
