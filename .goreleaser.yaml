@@ -67,13 +67,7 @@ brews:
     repository:
       owner: harleymckenzie
       name: homebrew-asc
-      pull_request:
-        enabled: true
-        draft: true
-        base:
-          owner: harleymckenzie
-          name: homebrew-asc
-          branch: main
+      branch: main
 
   # Beta formula (only on prerelease tags)
   - name: assm-beta
@@ -99,10 +93,4 @@ brews:
     repository:
       owner: harleymckenzie
       name: homebrew-asc
-      pull_request:
-        enabled: true
-        draft: true
-        base:
-          owner: harleymckenzie
-          name: homebrew-asc
-          branch: main
+      branch: main
